@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zls3434/m7s-engine/v4"
+	"github.com/zls3434/m7s-engine/v4/config"
+	"github.com/zls3434/m7s-engine/v4/util"
 	"go.uber.org/zap"
-	. "m7s.live/engine/v4"
-	"m7s.live/engine/v4/config"
-	"m7s.live/engine/v4/util"
 )
 
 //go:embed hls.js
@@ -26,12 +26,12 @@ var hls_js embed.FS
 var defaultTS []byte
 
 //go:embed default.yaml
-var defaultYaml DefaultYaml
+var defaultYaml engine.DefaultYaml
 var defaultSeq = 0                        // 默认片头的全局序号
 var writing = make(map[string]*HLSWriter) // preload 使用
 var writingMap sync.Map                   // 非preload使用
 var hlsConfig = &HLSConfig{}
-var HLSPlugin = InstallPlugin(hlsConfig, defaultYaml)
+var HLSPlugin = engine.InstallPlugin(hlsConfig, defaultYaml)
 
 type HLSConfig struct {
 	config.HTTP
@@ -50,7 +50,7 @@ type HLSConfig struct {
 
 func (c *HLSConfig) OnEvent(event any) {
 	switch v := event.(type) {
-	case FirstConfig:
+	case engine.FirstConfig:
 		if !c.Preload {
 			c.Internal = false // 如何不预加载，则为非内部订阅
 		}
@@ -79,13 +79,13 @@ func (c *HLSConfig) OnEvent(event any) {
 				}
 			}()
 		}
-	case SEclose:
+	case engine.SEclose:
 		if c.Preload {
 			delete(writing, v.Target.Path)
 		} else {
 			writingMap.Delete(v.Target.Path)
 		}
-	case SEpublish:
+	case engine.SEpublish:
 		if c.Preload {
 			if writing[v.Target.Path] == nil && (!c.Filter.Valid() || c.Filter.MatchString(v.Target.Path)) {
 				if _, ok := v.Target.Publisher.(*HLSPuller); !ok || c.RelayMode == 0 {
@@ -95,7 +95,7 @@ func (c *HLSConfig) OnEvent(event any) {
 				}
 			}
 		}
-	case InvitePublish: //按需拉流
+	case engine.InvitePublish: //按需拉流
 		if remoteURL := c.CheckPullOnSub(v.Target); remoteURL != "" {
 			if err := HLSPlugin.Pull(v.Target, remoteURL, new(HLSPuller), 0); err != nil {
 				HLSPlugin.Error("pull", zap.String("streamPath", v.Target), zap.String("url", remoteURL), zap.Error(err))
@@ -105,13 +105,13 @@ func (c *HLSConfig) OnEvent(event any) {
 }
 
 func (config *HLSConfig) API_List(w http.ResponseWriter, r *http.Request) {
-	util.ReturnFetchValue(FilterStreams[*HLSPuller], w, r)
+	util.ReturnFetchValue(engine.FilterStreams[*HLSPuller], w, r)
 }
 
 // 处于拉流时，可以调用这个API将拉流的TS文件保存下来，这个http如果断开，则停止保存
 func (config *HLSConfig) API_Save(w http.ResponseWriter, r *http.Request) {
 	streamPath := r.URL.Query().Get("streamPath")
-	if s := Streams.Get(streamPath); s != nil {
+	if s := engine.Streams.Get(streamPath); s != nil {
 		if hls, ok := s.Publisher.(*HLSPuller); ok {
 			hls.SaveContext = r.Context()
 			<-hls.SaveContext.Done()
@@ -175,7 +175,7 @@ func (config *HLSConfig) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							go outStream.Start(streamPath + "?" + r.URL.RawQuery)
 						}
 					} else {
-						TryInvitePublish(streamPath)
+						engine.TryInvitePublish(streamPath)
 					}
 				}
 				time.Sleep(time.Second)
@@ -213,7 +213,7 @@ default.ts`, defaultSeq, int(math.Ceil(config.DefaultTSDuration.Seconds())), def
 			for {
 				if tsData := tsData.GetTs(fileName); tsData != nil {
 					switch v := tsData.(type) {
-					case *MemoryTs:
+					case *engine.MemoryTs:
 						v.WriteTo(w)
 					case *util.ListItem[util.Buffer]:
 						w.Write(v.Value)

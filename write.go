@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zls3434/m7s-engine/v4"
+	"github.com/zls3434/m7s-engine/v4/codec"
+	"github.com/zls3434/m7s-engine/v4/codec/mpegts"
+	"github.com/zls3434/m7s-engine/v4/track"
+	"github.com/zls3434/m7s-engine/v4/util"
 	"go.uber.org/zap"
-	. "m7s.live/engine/v4"
-	"m7s.live/engine/v4/codec"
-	"m7s.live/engine/v4/codec/mpegts"
-	"m7s.live/engine/v4/track"
-	"m7s.live/engine/v4/util"
 )
 
 var memoryTs util.Map[string, interface {
@@ -33,7 +33,7 @@ type TrackReader struct {
 	sync.RWMutex
 	M3u8 util.Buffer
 	pes  *mpegts.MpegtsPESFrame
-	ts   *MemoryTs
+	ts   *engine.MemoryTs
 	*track.AVRingReader
 	write_time         time.Duration
 	m3u8Name           string
@@ -45,7 +45,7 @@ type TrackReader struct {
 }
 
 func (tr *TrackReader) init(hls *HLSWriter, media *track.Media, pid uint16) {
-	tr.ts = &MemoryTs{
+	tr.ts = &engine.MemoryTs{
 		BytesPool: hls.pool,
 	}
 	tr.pes = &mpegts.MpegtsPESFrame{
@@ -77,7 +77,7 @@ type HLSWriter struct {
 	pool         util.BytesPool
 	audio_tracks []*AudioTrackReader
 	video_tracks []*VideoTrackReader
-	Subscriber
+	engine.Subscriber
 	memoryTs     util.Map[string, util.Recyclable]
 	lastReadTime time.Time
 }
@@ -158,7 +158,7 @@ func (hls *HLSWriter) ReadTrack() {
 					t.TrackReader.frag(hls, frame.Timestamp)
 				}
 				t.pes.IsKeyFrame = frame.IFrame
-				if err = t.ts.WriteVideoFrame(VideoFrame{frame, t.Video, t.AbsTime, uint32(frame.PTS), uint32(frame.DTS)}, t.pes); err != nil {
+				if err = t.ts.WriteVideoFrame(engine.VideoFrame{frame, t.Video, t.AbsTime, uint32(frame.PTS), uint32(frame.DTS)}, t.pes); err != nil {
 					return
 				}
 			}
@@ -174,7 +174,7 @@ func (hls *HLSWriter) ReadTrack() {
 				}
 				t.TrackReader.frag(hls, frame.Timestamp)
 				t.pes.IsKeyFrame = false
-				if err = t.ts.WriteAudioFrame(AudioFrame{frame, t.Audio, t.AbsTime, uint32(frame.PTS), uint32(frame.DTS)}, t.pes); err != nil {
+				if err = t.ts.WriteAudioFrame(engine.AudioFrame{frame, t.Audio, t.AbsTime, uint32(frame.PTS), uint32(frame.DTS)}, t.pes); err != nil {
 					return
 				}
 			}
@@ -199,7 +199,7 @@ func (t *TrackReader) frag(hls *HLSWriter, ts time.Duration) (err error) {
 		tsFilePath := streamPath + "/" + tsFilename
 
 		// println(hls.currentTs.Length)
-		t.ts = &MemoryTs{
+		t.ts = &engine.MemoryTs{
 			BytesPool: t.ts.BytesPool,
 			PMT:       t.ts.PMT,
 		}

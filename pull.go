@@ -14,15 +14,15 @@ import (
 	"time"
 
 	"github.com/quangngotan95/go-m3u8/m3u8"
+	"github.com/zls3434/m7s-engine/v4"
+	"github.com/zls3434/m7s-engine/v4/util"
 	"go.uber.org/zap"
-	. "m7s.live/engine/v4"
-	"m7s.live/engine/v4/util"
 )
 
 // HLSPuller HLS拉流者
 type HLSPuller struct {
-	TSPublisher
-	Puller
+	engine.TSPublisher
+	engine.Puller
 	Video       M3u8Info
 	Audio       M3u8Info
 	TsHead      http.Header     `json:"-" yaml:"-"` //用于提供cookie等特殊身份的http头
@@ -79,13 +79,13 @@ func readM3U8(res *http.Response) (playlist *m3u8.Playlist, err error) {
 }
 func (p *HLSPuller) OnEvent(event any) {
 	switch event.(type) {
-	case IPublisher:
+	case engine.IPublisher:
 		p.TSPublisher.OnEvent(event)
 		if hlsConfig.RelayMode != 0 {
 			p.Stream.NeverTimeout = true
 			memoryTs.Add(p.StreamPath, p)
 		}
-	case SEKick, SEclose:
+	case engine.SEKick, engine.SEclose:
 		if hlsConfig.RelayMode == 1 {
 			memoryTs.Delete(p.StreamPath)
 		}
@@ -114,9 +114,9 @@ func (p *HLSPuller) pull(info *M3u8Info) (err error) {
 	tsbuffer := make(chan io.ReadCloser)
 	bytesPool := make(util.BytesPool, 30)
 	tsRing := util.NewRing[string](6)
-	var tsReader *TSReader
+	var tsReader *engine.TSReader
 	if hlsConfig.RelayMode != 1 {
-		tsReader = NewTSReader(&p.TSPublisher)
+		tsReader = engine.NewTSReader(&p.TSPublisher)
 		defer tsReader.Close()
 	}
 	defer func() {

@@ -1,11 +1,11 @@
-module m7s.live/plugin/hls/v4
+module github.com/zls3434/m7s-plugin-hls/v4
 
 go 1.18
 
 require (
 	github.com/quangngotan95/go-m3u8 v0.1.0
 	go.uber.org/zap v1.26.0
-	m7s.live/engine/v4 v4.14.6
+	github.com/zls3434/m7s-engine/v4 v4.15.3
 )
 
 require (
